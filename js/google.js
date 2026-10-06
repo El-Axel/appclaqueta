@@ -78,26 +78,42 @@ const Goog = (() => {
     delete t.eventoId; delete t.eventoLink;
   }
 
-  /* ---------- Maps: direcciones reales (Places) y mapa ---------- */
+  /* ---------- Maps: Google (con clave) u OpenStreetMap (sin clave, gratis) ---------- */
   const nuevaSesion = () => crypto.randomUUID?.() || String(Math.random()); let sesion = nuevaSesion();   // agrupa las consultas de una misma búsqueda
-  async function sugerencias(texto) {
-    if (!hayMapas()) return [];
+  async function sugerencias(texto) {   // devuelve [{id, texto, lat?, lng?}]
+    if (!hayMapas()) {   // sin clave de Google: OpenStreetMap (Nominatim), que ya trae las coordenadas
+      const r = await pedir(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=es&countrycodes=${C.PAIS || 'co'}&q=${encodeURIComponent(texto)}`);
+      if (!r.ok) throw falla(r);
+      return (await r.json()).map(x => ({ id: String(x.place_id), texto: x.display_name, lat: +x.lat, lng: +x.lon }));
+    }
     const r = await pedir('https://places.googleapis.com/v1/places:autocomplete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': C.GOOGLE_API_KEY },
       body: JSON.stringify({ input: texto, languageCode: 'es', includedRegionCodes: [C.PAIS || 'co'], sessionToken: sesion }) });
     if (!r.ok) throw falla(r);
     return ((await r.json()).suggestions || []).filter(s => s.placePrediction).map(s => ({ id: s.placePrediction.placeId, texto: s.placePrediction.text.text }));
   }
-  async function lugar(id) {   // dirección completa y coordenadas de la sugerencia elegida
-    const r = await pedir(`https://places.googleapis.com/v1/places/${id}?languageCode=es&sessionToken=${sesion}`, { headers: { 'X-Goog-Api-Key': C.GOOGLE_API_KEY, 'X-Goog-FieldMask': 'id,formattedAddress,location' } });
+  async function lugar(s) {   // dirección completa y coordenadas de la sugerencia elegida
+    if (typeof s === 'string') s = { id: s };
+    if (s.lat != null) return { dir: s.texto, lat: s.lat, lng: s.lng, placeId: s.id };
+    const r = await pedir(`https://places.googleapis.com/v1/places/${s.id}?languageCode=es&sessionToken=${sesion}`, { headers: { 'X-Goog-Api-Key': C.GOOGLE_API_KEY, 'X-Goog-FieldMask': 'id,formattedAddress,location' } });
     if (!r.ok) throw falla(r);
     const j = await r.json(); sesion = nuevaSesion();
     return { dir: j.formattedAddress, lat: j.location.latitude, lng: j.location.longitude, placeId: j.id };
   }
-  async function mapa(el, lat, lng) {
-    if (!hayMapas()) return;
-    if (!window.google?.maps?.importLibrary) await script(`https://maps.googleapis.com/maps/api/js?key=${C.GOOGLE_API_KEY}&loading=async&v=weekly`);
-    const { Map } = await google.maps.importLibrary('maps'), { Marker } = await google.maps.importLibrary('marker');
-    new Marker({ position: { lat, lng }, map: new Map(el, { center: { lat, lng }, zoom: 16, disableDefaultUI: true, gestureHandling: 'cooperative' }) });
+  const leaflet = () => window.L ? Promise.resolve() : new Promise((ok, mal) => {
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.append(l);
+    script('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js').then(ok, mal);
+  });
+  async function mapa(el, lat, lng) {   // dibuja el mapa con un marcador dentro del elemento «el»
+    el._m?.remove?.(); el._m = null; el.innerHTML = '';
+    if (hayMapas()) {
+      if (!window.google?.maps?.importLibrary) await script(`https://maps.googleapis.com/maps/api/js?key=${C.GOOGLE_API_KEY}&loading=async&v=weekly`);
+      const { Map } = await google.maps.importLibrary('maps'), { Marker } = await google.maps.importLibrary('marker');
+      new Marker({ position: { lat, lng }, map: new Map(el, { center: { lat, lng }, zoom: 16, disableDefaultUI: true, gestureHandling: 'cooperative' }) });
+    } else {
+      await leaflet();
+      const m = L.map(el, { zoomControl: false }).setView([lat, lng], 16);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m); L.marker([lat, lng]).addTo(m); el._m = m;
+    }
   }
 
   /* ---------- Clima (Open-Meteo: sin clave; pronóstico de hoy a 15 días) ---------- */

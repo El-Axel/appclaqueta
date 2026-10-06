@@ -8,7 +8,7 @@ const tarjeta = t => {
   const c = S.cots.find(x => x.id === t.cotId) || {}, d = new Date(t.fecha + 'T00:00');
   return `<a href="trabajo.html?id=${t.id}" class="cristal bloque !p-4 flex items-center gap-4">
     <div class="w-14 shrink-0 text-center rounded-2xl bg-white/10 py-2"><p class="text-xs muted">${d.toLocaleDateString('es-CO', { month: 'short' })}</p><p class="num text-xl leading-none">${d.getDate()}</p></div>
-    <div class="min-w-0 flex-1"><p class="font-bold truncate">${esc(c.titulo)}</p><p class="text-sm muted truncate">${esc(cli(c.clienteId).nombre)} · ${hora(t.ini)} – ${hora(t.fin)}</p>${t.dir ? `<p class="text-xs muted truncate mt-0.5">${esc(t.dir)}</p>` : ''}</div>
+    <div class="min-w-0 flex-1"><p class="font-bold truncate">${esc(c.titulo)}</p><p class="text-sm muted truncate">${esc(cli(c.clienteId).nombre)} · ${hora(t.ini)} – ${hora(t.fin)}</p>${t.dir || t.clima ? `<p class="text-xs muted truncate mt-0.5">${esc(t.dir)}${t.clima ? `${t.dir ? ' · ' : ''}${esc(t.clima.condicion)} ${t.clima.max}°` : ''}</p>` : ''}</div>
     <svg class="w-5 h-5 muted shrink-0" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>`;
 };
 
