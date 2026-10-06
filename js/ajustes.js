@@ -4,6 +4,7 @@ const V = $('#vista');
 // Si google.js no cargó (archivo faltante en el sitio), Ajustes igual se muestra y lo avisa
 const G = typeof Goog !== 'undefined' ? Goog : { hayGoogle: () => false, conectado: () => false, mensaje: () => 'Algo salió mal.' };
 const sinGoogle = typeof Goog === 'undefined';
+const motivo = (window.__fallos || []).find(x => /google/i.test(x));   // por qué falló, si se sabe
 const icono = p => `<svg viewBox="0 0 24 24"><path d="${p}"/></svg>`;
 
 function pantalla() {
@@ -12,9 +13,9 @@ function pantalla() {
 
     <section class="cristal bloque entra" style="--i:2" aria-labelledby="t-g">
       <h2 id="t-g" class="font-extrabold">Cuenta de Google</h2>
-      <p id="g-estado" class="text-sm muted mt-1">${on ? `Conectada como ${esc(g?.nombre)} (${esc(g?.correo)}). Ya puedes enviar cotizaciones por Gmail y agendar en Google Calendar.` : g ? 'Tu sesión venció. Reconecta para seguir usando Gmail y Calendar.' : G.hayGoogle() ? 'Sin conectar. Conéctala para enviar cotizaciones por Gmail y agendar en Google Calendar.' : sinGoogle ? 'No se pudo cargar js/google.js. Vuelve a subir la carpeta completa a Netlify.' : 'Falta el ID de cliente de Google en js/config.js.'}</p>
+      <p id="g-estado" class="text-sm muted mt-1">${sinGoogle ? `No se pudo cargar js/google.js${motivo ? ' (' + esc(motivo) + ')' : ''}. Revisa que el archivo se llame exactamente google.js dentro de la carpeta js y vuelve a subir la carpeta completa a Netlify.` : on ? `Conectada como ${esc(g?.nombre)} (${esc(g?.correo)}). Ya puedes enviar cotizaciones por Gmail y agendar en Google Calendar.` : g ? 'Tu sesión venció. Reconecta para seguir usando Gmail y Calendar.' : G.hayGoogle() ? 'Sin conectar. Conéctala para enviar cotizaciones por Gmail y agendar en Google Calendar.' : 'Falta el ID de cliente de Google en js/config.js.'}</p>
       ${on || !G.hayGoogle() ? '' : '<p class="text-xs muted mt-2">Google mostrará un aviso de «app no verificada»: toca «Avanzado» y continúa.</p>'}
-      <button id="g-btn" class="btn ${on ? 'btn-x' : 'btn-p'} mt-4">${on ? 'Desconectar' : g ? 'Reconectar' : 'Conectar con Google'}</button>
+      <button id="g-btn" class="btn ${on ? 'btn-x' : 'btn-p'} mt-4">${sinGoogle ? 'Recargar la página' : on ? 'Desconectar' : g ? 'Reconectar' : 'Conectar con Google'}</button>
     </section>
 
     <section class="cristal bloque mt-3 entra" style="--i:3" aria-labelledby="t-t">
@@ -41,6 +42,7 @@ function pantalla() {
   };
   $('#nuevoEq').onclick = () => hojaEquipo();
   $('#g-btn').onclick = async () => {
+    if (sinGoogle) return location.reload();
     if (!G.hayGoogle()) return aviso(sinGoogle ? 'No se cargó js/google.js.' : 'Falta el ID de cliente en js/config.js.');
     if (G.conectado()) { G.desconectar(); aviso('Cuenta desconectada'); return pantalla(); }
     try { await G.conectar(); aviso('Cuenta conectada'); pantalla(); }

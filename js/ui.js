@@ -79,7 +79,9 @@ const fdl = s => new Date(s + 'T00:00').toLocaleDateString('es-CO', { weekday: '
 const hora = s => new Date('2000-01-01T' + s).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
 
 /* Si un archivo falla al cargar, en vez de dejar la pantalla en blanco se muestra el motivo */
+window.__fallos = [];   // motivos de los archivos que no cargaron (los lee Ajustes y el diagnóstico)
 addEventListener('error', e => {
+  window.__fallos.push(e.target && e.target.tagName === 'SCRIPT' ? `no se pudo descargar ${e.target.getAttribute('src')}` : `${e.message || 'error'} (${String(e.filename || '').split('/').pop()}:${e.lineno || '?'})`);
   const v = document.getElementById('vista'); if (!v || v.children.length) return;
   const que = e.target && e.target.tagName === 'SCRIPT' ? `No se pudo cargar el archivo ${esc(e.target.getAttribute('src'))}.` : esc(e.message || 'Error desconocido.');
   v.innerHTML = vacio(`Algo salió mal al cargar esta ventana.<br><span class="text-xs">${que}</span><br><span class="text-xs">Sube de nuevo la carpeta completa y recarga con Ctrl + Shift + R. Abre <b>diagnostico.html</b> para ver qué falta.</span>`);
