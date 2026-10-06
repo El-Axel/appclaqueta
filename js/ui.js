@@ -77,3 +77,10 @@ const titulo = t => `<h1 class="text-[2.2rem] font-extrabold leading-none tracki
 /* Fechas y horas largas (para Agenda y Trabajo) */
 const fdl = s => new Date(s + 'T00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const hora = s => new Date('2000-01-01T' + s).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+
+/* Si un archivo falla al cargar, en vez de dejar la pantalla en blanco se muestra el motivo */
+addEventListener('error', e => {
+  const v = document.getElementById('vista'); if (!v || v.children.length) return;
+  const que = e.target && e.target.tagName === 'SCRIPT' ? `No se pudo cargar el archivo ${esc(e.target.getAttribute('src'))}.` : esc(e.message || 'Error desconocido.');
+  v.innerHTML = vacio(`Algo salió mal al cargar esta ventana.<br><span class="text-xs">${que}</span><br><span class="text-xs">Sube de nuevo la carpeta completa y recarga con Ctrl + Shift + R. Abre <b>diagnostico.html</b> para ver qué falta.</span>`);
+}, true);

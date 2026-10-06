@@ -5,6 +5,7 @@ const Goog = (() => {
   const ZONA = C.ZONA_HORARIA || 'America/Bogota', KT = 'claqueta-gtoken';
   const SCOPES = 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events';
   const CAL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+  const GIS = 'https://accounts.google.com/gsi/client';
   const hayGoogle = () => !!C.GOOGLE_CLIENT_ID, hayMapas = () => !!C.GOOGLE_API_KEY;
   const script = src => new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('RED')); document.head.append(s); });
   const falla = r => Object.assign(new Error('HTTP ' + r.status), { estado: r.status });
@@ -15,7 +16,7 @@ const Goog = (() => {
   const conectado = () => !!token();
   async function conectar() {
     if (!hayGoogle()) throw new Error('CONFIG');
-    if (!window.google?.accounts?.oauth2) await script('https://accounts.google.com/gsi/client');
+    if (!window.google?.accounts?.oauth2) await script(GIS);   // normalmente ya está cargado desde que se abrió la página
     await new Promise((ok, mal) => google.accounts.oauth2.initTokenClient({
       client_id: C.GOOGLE_CLIENT_ID, scope: SCOPES,
       callback: r => { if (r.error) return mal(new Error(r.error)); sessionStorage.setItem(KT, JSON.stringify({ token: r.access_token, vence: Date.now() + r.expires_in * 1000 })); ok(); },
@@ -40,6 +41,7 @@ const Goog = (() => {
 
   /* ---------- Gmail: envío real de la cotización ---------- */
   const b64 = s => { let b = ''; new TextEncoder().encode(s).forEach(x => b += String.fromCharCode(x)); return btoa(b); };
+  const b64mime = s => b64(s).replace(/.{1,76}/g, '$&\r\n').trim();   // líneas de 76 caracteres, como pide el estándar de correo
   const b64url = s => b64(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   function textoCotizacion(c, cl) {
     const x = calc(c), l = [`Hola ${cl.nombre},`, '', `Te comparto la cotización #${c.n} «${c.titulo}».`, '', 'Detalle:', `- Tiempo: ${c.horas} h × ${cop(c.tarifa)} = ${cop(x.t)}`,
@@ -52,7 +54,7 @@ const Goog = (() => {
   async function enviarCotizacion(c, cl) {
     if (!emailOk(cl.correo)) throw new Error('CORREO');
     const { asunto, cuerpo } = textoCotizacion(c, cl);
-    const raw = ['To: ' + cl.correo, `Subject: =?UTF-8?B?${b64(asunto)}?=`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64(cuerpo)].join('\r\n');
+    const raw = ['To: ' + cl.correo, `Subject: =?UTF-8?B?${b64(asunto)}?=`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64mime(cuerpo)].join('\r\n');
     const r = await api('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method: 'POST', body: JSON.stringify({ raw: b64url(raw) }) });
     return { mensajeId: r.id };
   }
@@ -108,6 +110,10 @@ const Goog = (() => {
     const d = (await r.json()).daily; if (!d?.time?.length) return null;
     return { condicion: WMO(d.weather_code[0]), min: Math.round(d.temperature_2m_min[0]), max: Math.round(d.temperature_2m_max[0]), lluvia: Math.round(d.precipitation_probability_max[0] ?? 0), consultadoEn: new Date().toISOString() };
   }
+
+  // Se precarga el script de inicio de sesión: así la ventana de Google se abre al instante con el clic
+  // (si se cargara después del clic, algunos navegadores, sobre todo Safari, la bloquean como «ventana emergente»)
+  if (hayGoogle() && !window.google?.accounts?.oauth2) script(GIS).catch(() => { /* se reintenta al conectar */ });
 
   return { hayGoogle, hayMapas, conectado, conectar, desconectar, mensaje, textoCotizacion, enviarCotizacion, guardarEvento, borrarEvento, sugerencias, lugar, mapa, climaDisponible, pronostico };
 })();

@@ -1,15 +1,20 @@
 /* ===== Claqueta · ventana Ajustes =====
    Google (próxima etapa) · tarifa por hora · mis equipos (#equipos) · datos */
 const V = $('#vista');
+// Si google.js no cargó (archivo faltante en el sitio), Ajustes igual se muestra y lo avisa
+const G = typeof Goog !== 'undefined' ? Goog : { hayGoogle: () => false, conectado: () => false, mensaje: () => 'Algo salió mal.' };
+const sinGoogle = typeof Goog === 'undefined';
 const icono = p => `<svg viewBox="0 0 24 24"><path d="${p}"/></svg>`;
 
 function pantalla() {
+  const g = S.cfg.google, on = G.conectado();
   V.innerHTML = `<div class="mt-12 mb-5 entra" style="--i:1">${titulo('Ajustes')}</div>
 
     <section class="cristal bloque entra" style="--i:2" aria-labelledby="t-g">
       <h2 id="t-g" class="font-extrabold">Cuenta de Google</h2>
-      <p id="g-estado" class="text-sm muted mt-1">Sin conectar. Conéctala para enviar cotizaciones por Gmail y agendar en Google Calendar.</p>
-      <button id="g-btn" class="btn btn-s mt-4">Conectar con Google</button>
+      <p id="g-estado" class="text-sm muted mt-1">${on ? `Conectada como ${esc(g?.nombre)} (${esc(g?.correo)}). Ya puedes enviar cotizaciones por Gmail y agendar en Google Calendar.` : g ? 'Tu sesión venció. Reconecta para seguir usando Gmail y Calendar.' : G.hayGoogle() ? 'Sin conectar. Conéctala para enviar cotizaciones por Gmail y agendar en Google Calendar.' : sinGoogle ? 'No se pudo cargar js/google.js. Vuelve a subir la carpeta completa a Netlify.' : 'Falta el ID de cliente de Google en js/config.js.'}</p>
+      ${on || !G.hayGoogle() ? '' : '<p class="text-xs muted mt-2">Google mostrará un aviso de «app no verificada»: toca «Avanzado» y continúa.</p>'}
+      <button id="g-btn" class="btn ${on ? 'btn-x' : 'btn-p'} mt-4">${on ? 'Desconectar' : g ? 'Reconectar' : 'Conectar con Google'}</button>
     </section>
 
     <section class="cristal bloque mt-3 entra" style="--i:3" aria-labelledby="t-t">
@@ -35,7 +40,12 @@ function pantalla() {
     errores(V, {}); S.cfg.tarifa = v; save(); aviso('Tarifa guardada');
   };
   $('#nuevoEq').onclick = () => hojaEquipo();
-  $('#g-btn').onclick = () => typeof Goog === 'undefined' ? aviso('La conexión con Google se activa en la siguiente etapa.') : Goog.conectar();
+  $('#g-btn').onclick = async () => {
+    if (!G.hayGoogle()) return aviso(sinGoogle ? 'No se cargó js/google.js.' : 'Falta el ID de cliente en js/config.js.');
+    if (G.conectado()) { G.desconectar(); aviso('Cuenta desconectada'); return pantalla(); }
+    try { await G.conectar(); aviso('Cuenta conectada'); pantalla(); }
+    catch (e) { aviso(['popup_closed', 'popup_failed_to_open', 'cancelado', 'access_denied'].includes(e.message) ? 'Conexión cancelada.' : G.mensaje(e)); }
+  };
   $('#ejemplo').onclick = async () => { if (await confirmar({ titulo: '¿Cargar datos de ejemplo?', texto: 'Se agregarán clientes, equipos, cotizaciones y un trabajo de ejemplo a tus datos.', boton: 'Cargar' })) { ejemplo(); aviso('Datos de ejemplo cargados'); pantalla(); } };
   $('#borrar').onclick = async () => { if (await confirmar({ titulo: '¿Borrar todos los datos?', texto: 'Se eliminarán clientes, equipos, cotizaciones, trabajos y pagos de este navegador. No se puede deshacer.', boton: 'Borrar todo', peligro: true })) { localStorage.removeItem(K); localStorage.removeItem(K + '-dr'); location.href = 'index.html'; } };
   equipos();

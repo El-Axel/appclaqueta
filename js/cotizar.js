@@ -52,8 +52,12 @@ async function accion(c, a, cl, t) {
   if (a === 'enviar') {
     if (!cl.correo) return aviso('Este cliente no tiene correo. Agrégalo en Clientes.');
     if (!googleListo()) return aviso('Conecta tu cuenta de Google en Ajustes para enviar por correo.');
+    const { asunto, cuerpo } = Goog.textoCotizacion(c, cl);   // vista previa: el usuario ve exactamente lo que se enviará
+    const ok = await abrirHoja('Enviar cotización', `<p class="lbl">Para</p><p class="mb-3 break-all">${esc(cl.correo)}</p><p class="lbl">Asunto</p><p class="mb-3 font-bold">${esc(asunto)}</p><p class="lbl">Mensaje</p><div class="inp mb-3 text-sm max-h-60 overflow-auto" style="white-space:pre-wrap">${esc(cuerpo)}</div>`, 'Enviar ahora', () => true);
+    if (!ok) return;
+    aviso('Enviando…');
     try { const r = await Goog.enviarCotizacion(c, cl); c.enviadaEn = new Date().toISOString(); c.mensajeId = r?.mensajeId; estado(c, 'enviada', `Cotización enviada a ${cl.correo}`); }
-    catch { aviso('No se pudo enviar. Inténtalo de nuevo.'); }
+    catch (e) { aviso(Goog.mensaje(e)); }
   } else if (a === 'duplicar') {
     const n = Math.max(0, ...S.cots.map(x => x.n)) + 1, copia = { ...structuredClone(c), id: uid(), n, estado: 'borrador', fecha: hoy(), enviadaEn: undefined, mensajeId: undefined };
     S.cots.push(copia); save(); location.href = `cotizar.html?id=${copia.id}`;
@@ -61,6 +65,7 @@ async function accion(c, a, cl, t) {
     const ok = await confirmar({ titulo: '¿Eliminar esta cotización?', boton: 'Eliminar', peligro: true,
       texto: c.estado === 'aceptada' ? `Está aceptada y cuenta en la cuenta de ${esc(cl.nombre)}: el saldo cambiará.${t ? ' También se quitará su trabajo de la agenda.' : ''}` : 'No se puede deshacer.' });
     if (!ok) return;
+    if (t?.eventoId && googleListo()) try { await Goog.borrarEvento(t); } catch { /* si falla, el evento queda en Calendar */ }
     S.cots = S.cots.filter(x => x.id !== c.id); S.trabajos = S.trabajos.filter(x => x.cotId !== c.id); save(); location.href = 'cotizar.html';
   } else estado(c, a, { enviada: 'Marcada como enviada', aceptada: 'Cotización aceptada', rechazada: 'Cotización rechazada', borrador: 'Vuelve a ser borrador' }[a]);
 }

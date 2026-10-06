@@ -107,3 +107,5 @@ select.inp option { background: #16241c; }
 .dia i { position: absolute; left: 50%; bottom: .3rem; width: .28rem; height: .28rem; margin-left: -.14rem; border-radius: 50%; background: var(--menta); }
 .dia[aria-pressed="true"] i { background: var(--noche); }
 @media (hover: hover) { .dia:hover:not([aria-pressed="true"]) { background: rgba(255,255,255,.1); } }
+
+.btn[disabled] { opacity: .45; pointer-events: none; }

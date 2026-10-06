@@ -24,15 +24,21 @@ function trabajo() {
       ${notas.length ? `<ul class="grid gap-1.5 mt-2">${notas.map(l => `<li class="flex gap-2"><span class="text-menta" aria-hidden="true">•</span><span>${esc(l)}</span></li>`).join('')}</ul>` : '<p class="muted mt-1">Sin notas. Edita el trabajo para agregar lo que debes llevar.</p>'}</section>
 
     <section class="cristal bloque mt-3 entra" style="--i:6" aria-labelledby="t-g"><h2 id="t-g" class="font-extrabold">Google Calendar</h2>
-      <p id="gcal" class="text-sm muted mt-1">${t.eventoId ? 'Este trabajo ya está en tu Google Calendar.' : 'Este trabajo aún no está en tu Google Calendar. Conecta tu cuenta en Ajustes.'}</p></section>
+      <p id="gcal" class="text-sm muted mt-1">${t.eventoId ? 'Este trabajo ya está en tu Google Calendar.' : googleListo() ? 'Este trabajo aún no está en tu Google Calendar.' : 'Este trabajo aún no está en tu Google Calendar. Conecta tu cuenta en Ajustes.'}</p>
+      ${googleListo() || t.eventoId ? `<div class="grid grid-cols-2 gap-3 mt-4">${t.eventoLink ? `<a class="btn btn-s" target="_blank" rel="noopener" href="${esc(t.eventoLink)}">Abrir en Calendar</a>` : ''}<button class="btn ${t.eventoId ? 'btn-s' : 'btn-p col-span-2'}" id="evento" ${googleListo() ? '' : 'disabled'}>${t.eventoId ? 'Actualizar evento' : 'Crear evento en Calendar'}</button></div>` : ''}</section>
 
     <div class="grid gap-3 mt-5 entra" style="--i:7"><a class="btn btn-s" href="cotizar.html?id=${t.cotId}">Ver cotización</a>
       <div class="grid grid-cols-2 gap-3"><button class="btn btn-s" id="editar">Editar trabajo</button><button class="btn btn-x" id="quitar">Quitar de la agenda</button></div></div>`;
 
   $('#copiar')?.addEventListener('click', () => navigator.clipboard?.writeText(t.dir || ruta).then(() => aviso('Dirección copiada'), () => aviso('No se pudo copiar.')));
+  $('#evento')?.addEventListener('click', async () => {
+    aviso('Guardando en Calendar…');
+    try { await Goog.guardarEvento(t); aviso('Evento guardado en tu Google Calendar'); trabajo(); } catch (e) { aviso(Goog.mensaje(e)); }
+  });
   $('#editar').onclick = () => agendar(t.cotId, trabajo);
   $('#quitar').onclick = async () => {
-    if (!await confirmar({ titulo: '¿Quitar de la agenda?', texto: 'La cotización seguirá aceptada y podrás agendarla de nuevo.', boton: 'Quitar', peligro: true })) return;
+    if (!await confirmar({ titulo: '¿Quitar de la agenda?', texto: 'La cotización seguirá aceptada y podrás agendarla de nuevo.' + (t.eventoId ? (googleListo() ? ' También se borrará el evento de tu Google Calendar.' : ' El evento seguirá en tu Calendar porque tu cuenta no está conectada.') : ''), boton: 'Quitar', peligro: true })) return;
+    if (t.eventoId && googleListo()) try { await Goog.borrarEvento(t); } catch { aviso('El evento no se pudo borrar de Calendar; bórralo a mano.'); }
     S.trabajos = S.trabajos.filter(x => x.id !== t.id); save(); location.href = 'agenda.html';
   };
 }
